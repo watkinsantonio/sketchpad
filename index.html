@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1020">
+<meta name="robots" content="noindex">
+<title>Sketchpad</title>
+<style>
+  :root {
+    --bg: #0f1020; --card: #1a1b30; --line: #2c2e4a; --text: #f1f1f7; --dim: #9a9cb8;
+    --accent: #ff4f8b; --accent2: #8a6bff; --ok: #3ad29f; --warn: #ffb547;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 520px; margin: 0 auto; padding: 16px 16px calc(32px + env(safe-area-inset-bottom)); }
+  header { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 16px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: .3px; }
+  .status { font-size: 13px; color: var(--dim); display: flex; align-items: center; gap: 6px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #555; }
+  .dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin: 0 0 12px; font-weight: 600; }
+  button { font: inherit; color: var(--text); background: #26284a; border: 1px solid var(--line);
+    border-radius: 14px; padding: 12px 14px; cursor: pointer; }
+  button:active { transform: scale(.97); }
+  button.primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); border: 0; font-weight: 600; width: 100%; padding: 14px; }
+  button.stop { background: #3a1626; border-color: #6b2440; color: #ff8fb3; width: 100%; font-weight: 700; padding: 16px; font-size: 18px; }
+  .meter { height: 140px; display: flex; align-items: flex-end; gap: 3px; margin-bottom: 14px; }
+  .meter i { flex: 1; background: linear-gradient(to top, var(--accent2), var(--accent)); border-radius: 3px 3px 0 0; min-height: 2px; opacity: .85; }
+  .big { font-size: 44px; font-weight: 700; text-align: center; margin: -4px 0 6px; font-variant-numeric: tabular-nums; }
+  .big small { font-size: 16px; color: var(--dim); font-weight: 500; }
+  input[type=range] { width: 100%; -webkit-appearance: none; appearance: none; height: 34px; background: transparent; }
+  input[type=range]::-webkit-slider-runnable-track { height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--accent2), var(--accent)); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 32px; height: 32px; margin-top: -11px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px #0008; }
+  .steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 8px; }
+  .steps button { padding: 10px 0; }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .rh { text-align: left; padding: 12px; }
+  .rh b { display: block; font-size: 15px; }
+  .rh span { font-size: 12px; color: var(--dim); }
+  .rh.active { border-color: var(--accent); background: #34203f; }
+  .row { display: flex; gap: 10px; align-items: center; margin: 10px 0; }
+  .row label { flex: 0 0 96px; font-size: 14px; color: var(--dim); }
+  .row input[type=text], .row input[type=number], .row select { flex: 1; min-width: 0; font: inherit; color: var(--text);
+    background: #11122a; border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; }
+  .chars { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow: auto; }
+  .chars label { display: flex; gap: 8px; align-items: flex-start; font: 12px/1.35 ui-monospace, Menlo, monospace; background: #11122a; padding: 8px; border-radius: 10px; border: 1px solid var(--line); word-break: break-all; }
+  .log { font: 12px/1.4 ui-monospace, Menlo, monospace; color: var(--dim); background: #0b0c1a; border-radius: 10px; padding: 8px; height: 120px; overflow: auto; white-space: pre-wrap; }
+  details summary { cursor: pointer; color: var(--dim); font-size: 14px; }
+  .note { font-size: 13px; color: var(--dim); }
+  .warnbox { background: #2d2310; border: 1px solid #5c4515; color: #ffd48a; border-radius: 14px; padding: 12px; font-size: 14px; margin-bottom: 14px; }
+  .hidden { display: none !important; }
+  .btnrow { display: flex; gap: 10px; margin-top: 10px; }
+  .btnrow button { flex: 1; font-size: 15px; }
+  .auto { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); max-width: 496px; margin: 0 auto;
+    background: #22243f; border: 1px solid var(--accent); border-radius: 18px; padding: 14px; box-shadow: 0 10px 30px #000a; z-index: 10; }
+  .auto p { margin: 0 0 10px; font-size: 15px; }
+  .auto .yes { background: var(--ok); color: #062; border: 0; font-weight: 700; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Sketchpad</h1>
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">Not connected</span></div>
+  </header>
+
+  <div class="warnbox hidden" id="noBle">
+    This browser can't use Bluetooth. On iPhone, Safari and Chrome don't support it —
+    open this page in the free <b>Bluefy</b> browser from the App Store instead.
+  </div>
+
+  <div class="card">
+    <button class="primary" id="connectBtn">Connect device</button>
+    <div class="note" id="chanNote" style="margin-top:8px"></div>
+    <div class="btnrow"><button id="autoBtn">Find the right setting</button><button id="copyBtn">Copy error report</button></div>
+    <button id="repairBtn" class="hidden" style="width:100%;margin-top:10px;border-color:var(--warn);color:var(--warn)">Name box “Sketchpad”</button>
+  </div>
+
+  <div class="card">
+    <h2>Speed</h2>
+    <div class="meter" id="meter"></div>
+    <div class="big"><span id="levelOut">0</span><small>%</small></div>
+    <input type="range" id="speed" min="0" max="100" value="0">
+    <div class="steps">
+      <button data-s="0">Off</button><button data-s="25">25</button><button data-s="50">50</button><button data-s="75">75</button><button data-s="100">Max</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Rhythm</h2>
+    <div class="grid" id="rhythms"></div>
+    <div class="row" style="margin-top:14px"><label>Tempo</label><input type="range" id="tempo" min="25" max="300" value="100"></div>
+  </div>
+
+  <button class="stop" id="stopBtn">STOP</button>
+
+  <div class="card" style="margin-top:14px">
+    <details id="setup">
+      <summary>Device setup &amp; testing</summary>
+      <p class="note">After connecting, pick the channel the device listens on (usually the one marked <b>write</b>), then choose a command format and press Test. Settings are saved on this phone only.</p>
+      <h2 style="margin-top:12px">Channels</h2>
+      <div class="chars" id="chars"><span class="note">Connect a device to see its channels.</span></div>
+      <h2 style="margin-top:16px">Command format</h2>
+      <div class="row"><label>Preset</label>
+        <select id="preset">
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+      <div class="row"><label>Template</label><input type="text" id="template" placeholder="e.g. {v}"></div>
+      <div class="row"><label>Max value</label><input type="number" id="maxv" min="1" max="65535"></div>
+      <div class="row"><label>Write mode</label>
+        <select id="wmode"><option value="auto">Auto</option><option value="resp">With response</option><option value="noresp">Without response</option></select>
+      </div>
+      <p class="note">Template is hex bytes. <code>{v}</code> = speed as one byte (0 to max), <code>{v16}</code> = two bytes, <code>{sum}</code> = checksum of the bytes before it, <code>{chk}</code> = same but skipping the first byte.</p>
+      <div class="row"><button id="testBtn" style="flex:1">Test (2s at 50%)</button></div>
+      <h2 style="margin-top:16px">Send raw bytes</h2>
+      <div class="row"><input type="text" id="raw" placeholder="hex, e.g. AA 01 32"><button id="rawBtn">Send</button></div>
+      <h2 style="margin-top:16px">Log</h2>
+      <div class="log" id="log"></div>
+      <div class="row"><label>Extra service</label><input type="text" id="extraSvc" placeholder="UUID to allow (optional)"></div>
+      <p class="note">This page has no tracking and makes no network requests. Everything stays between this phone and the device.</p>
+    </details>
+  </div>
+</main>
+<div class="auto hidden" id="autoBox">
+  <p id="autoText">Testing…</p>
+  <div class="btnrow" style="margin-top:0"><button class="yes" id="autoYes">That worked</button><button id="autoStop">Stop test</button></div>
+</div>
+
+<script>
+(() => {
+  // ---------- storage helpers ----------
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('sp.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem('sp.' + k, JSON.stringify(v)); } catch {} }
+  };
+  const $ = id => document.getElementById(id);
+  const logEl = $('log');
+  const LOG = [];
+  const log = (...a) => {
+    const d = new Date(), ts = d.toTimeString().slice(0, 8) + '.' + String(d.getMilliseconds()).padStart(3, '0');
+    const line = ts + ' ' + a.join(' ');
+    LOG.push(line); if (LOG.length > 1500) LOG.shift();
+    logEl.textContent += line + '\n';
+    if (logEl.textContent.length > 60000) logEl.textContent = logEl.textContent.slice(-40000);
+    logEl.scrollTop = logEl.scrollHeight;
+  };
+  window.addEventListener('error', e => log('PAGE ERROR:', e.message, '@', (e.filename || '').split('/').pop() + ':' + e.lineno));
+  window.addEventListener('unhandledrejection', e => log('PAGE ERROR (promise):', (e.reason && (e.reason.name + ': ' + e.reason.message)) || String(e.reason)));
+
+  // ---------- command presets ----------
+  const PRESETS = [
+    // Profile A is the one that works with the box: CC 03 <0-100> <speed+3> on FFE9, write without response.
+    { id: 'pa', name: 'Profile A (CC 03)', template: 'CC 03 {v} {chk}', max: 100, chan: 'ffe9', wmode: 'noresp' },
+    { id: 'pb', name: 'Profile B (AA 04)', template: 'AA 04 {v} {chk}', max: 100, chan: 'ffe9' },
+    { id: 'pc', name: 'Profile C (AA 05)', template: 'AA 05 {v} {chk}', max: 100, chan: 'ffe9' },
+    { id: 'pd', name: 'Profile D (AA 06)', template: 'AA 06 {v} {chk}', max: 100, chan: 'ffe9' },
+    { id: 'pe', name: 'Profile E (AA 03)', template: 'AA 03 {v} {chk}', max: 100, chan: 'ffe9' },
+    { id: 'pf', name: 'Profile F (CC 01)', template: 'CC 01 {v} {chk}', max: 100, chan: 'ffe9' },
+    { id: 'byte255', name: 'Single byte 0–255', template: '{v}', max: 255 },
+    { id: 'byte100', name: 'Single byte 0–100', template: '{v}', max: 100 },
+    { id: 'byte20',  name: 'Single byte 0–20',  template: '{v}', max: 20 },
+    { id: 'aa01',    name: 'AA 01 + level (0–100)', template: 'AA 01 {v}', max: 100 },
+    { id: 'a5',      name: 'A5 + level + checksum', template: 'A5 {v} {sum}', max: 100 },
+    { id: 'b01',     name: '01 + level (0–100)', template: '01 {v}', max: 100 },
+    { id: 'b0x',     name: 'level + 00 (0–255)', template: '{v} 00', max: 255 },
+    { id: 'a001',    name: 'A0 01 + level (0–255)', template: 'A0 01 {v}', max: 255 },
+    { id: 'txtnum',  name: 'Number as text (0–100)', template: 'text:{v}', max: 100 },
+    { id: 'aa55',    name: 'AA 55 + level + 55 AA', template: 'AA 55 {v} 55 AA', max: 100 },
+  ];
+  const presetSel = $('preset');
+  PRESETS.forEach(p => presetSel.insertAdjacentHTML('beforeend', `<option value="${p.id}">${p.name}</option>`));
+
+  const cfg = Object.assign({ preset: 'byte255', template: '{v}', max: 255, wmode: 'auto', charKey: null, extraSvc: '' }, store.get('cfg', {}));
+  const saveCfg = () => store.set('cfg', cfg);
+  presetSel.value = cfg.preset; $('template').value = cfg.template; $('maxv').value = cfg.max; $('wmode').value = cfg.wmode; $('extraSvc').value = cfg.extraSvc;
+  presetSel.onchange = () => {
+    cfg.preset = presetSel.value;
+    const p = PRESETS.find(x => x.id === cfg.preset);
+    if (p) { cfg.template = p.template; cfg.max = p.max; $('template').value = p.template; $('maxv').value = p.max; }
+    if (p) { cfg.wmode = p.wmode || 'auto'; $('wmode').value = cfg.wmode; }
+    if (p && p.chan) { const ch = chars.find(x => x.writable && short(x.c.uuid) === p.chan); if (ch) { target = ch; cfg.charKey = ch.key; renderChars(); } }
+    cfg.confirmed = true; saveCfg(); lastSent = null; updateChanNote();
+  };
+  $('template').oninput = e => { cfg.template = e.target.value; cfg.preset = 'custom'; presetSel.value = 'custom'; saveCfg(); lastSent = null; };
+  $('maxv').oninput = e => { cfg.max = Math.max(1, +e.target.value || 1); saveCfg(); lastSent = null; };
+  $('wmode').onchange = e => { cfg.wmode = e.target.value; saveCfg(); };
+  $('extraSvc').onchange = e => { cfg.extraSvc = e.target.value.trim(); saveCfg(); };
+
+  function parseHex(s) {
+    const clean = s.replace(/0x/gi, '').replace(/[^0-9a-f]/gi, '');
+    if (clean.length % 2) throw new Error('odd number of hex digits');
+    const out = []; for (let i = 0; i < clean.length; i += 2) out.push(parseInt(clean.substr(i, 2), 16));
+    return out;
+  }
+  function buildCommand(level01) {
+    const v = Math.round(level01 * cfg.max);
+    const t = cfg.template.trim();
+    if (t.startsWith('text:')) return new TextEncoder().encode(t.slice(5).replace(/\{n\}|\{v\}/g, String(v)));
+    const bytes = [];
+    for (const tok of t.split(/\s+/).filter(Boolean)) {
+      if (tok === '{v}') bytes.push(v & 0xff);
+      else if (tok === '{v16}') bytes.push((v >> 8) & 0xff, v & 0xff);
+      else if (tok === '{sum}') bytes.push(bytes.reduce((a, b) => a + b, 0) & 0xff);
+      else if (tok === '{chk}') bytes.push(bytes.slice(1).reduce((a, b) => a + b, 0) & 0xff);
+      else bytes.push(...parseHex(tok));
+    }
+    return new Uint8Array(bytes);
+  }
+  const hex = u8 => Array.from(u8, b => b.toString(16).padStart(2, '0')).join(' ');
+
+  // ---------- bluetooth ----------
+  const COMMON_SERVICES = [
+    0xfff0, 0xffe0, 0xffb0, 0xfee7, 0xfe95, 0xae00, 0xae30, 0xff00, 0xffa0, 0xfff5, 0xffd0, 0x1910, 0x180a, 0x180f,
+    '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART
+    '0000fff0-0000-1000-8000-00805f9b34fb',
+    '53300001-0023-4bd4-bbd5-a6920e4c5653',
+    '50300001-0024-4bd4-bbd5-a6920e4c5653',
+    '57300001-0023-4bd4-bbd5-a6920e4c5653',
+    '5a300001-0023-4bd4-bbd5-a6920e4c5653',
+    '40ee1111-63ec-4b7f-8ce7-712efd55b90e',
+    '0000ae00-0000-1000-8000-00805f9b34fb',
+    '0000ffe5-0000-1000-8000-00805f9b34fb',
+  ];
+  // Bluefy needs full 128-bit UUIDs spelled out.
+  const full = u => typeof u === 'number' ? `0000${u.toString(16).padStart(4, '0')}-0000-1000-8000-00805f9b34fb` : u.toLowerCase();
+  // Bluefy reports short IDs ("FFE9"), Chrome long ones; compare on a short lowercase form.
+  const short = u => { u = String(u).toLowerCase(); const m = u.match(/^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/); return m ? m[1] : u; };
+  const errMsg = e => e && e.message ? ((e.name && e.name !== 'Error' ? e.name + ': ' : '') + e.message) : String(e || 'unknown error');
+  let device = null, server = null, chars = [], target = null, writing = false, pending = null, lastSent = null;
+
+  if (!navigator.bluetooth) $('noBle').classList.remove('hidden');
+
+  function setStatus(on, text) { $('dot').classList.toggle('on', on); $('statusText').textContent = text; $('connectBtn').textContent = on ? 'Disconnect' : 'Connect device'; }
+
+  async function connect() {
+    if (!navigator.bluetooth) { alert('Bluetooth is not available in this browser. On iPhone use the Bluefy browser.'); return; }
+    const services = [...new Set(COMMON_SERVICES.map(full))];
+    if (cfg.extraSvc) services.push(full(/^[0-9a-f]{4}$/i.test(cfg.extraSvc) ? parseInt(cfg.extraSvc, 16) : cfg.extraSvc));
+    try {
+      device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: services });
+    } catch (e) { log('Device picker closed:', errMsg(e)); return; }
+    device.addEventListener('gattserverdisconnected', onDisconnect);
+    setStatus(false, 'Connecting…');
+    try {
+      server = await device.gatt.connect();
+      log('Connected to', device.name || '(unnamed)', 'id', device.id);
+      await discover();
+      setStatus(true, device.name || 'Connected'); updateChanNote();
+    } catch (e) { log('Connect failed:', errMsg(e)); setStatus(false, 'Failed — try again'); }
+  }
+
+  // Never send commands to device-info, settings, firmware-update or DFU services: writing there can rename,
+  // misconfigure or even brick the box. (FF90 = settings incl. name on FF91, FFC0 = firmware update, FE59 = DFU.)
+  const BOX_NAME = 'Sketchpad';
+  // Built-in IDs the box reports, stored as hex so they aren't readable in the source.
+  const unhex = h => h.match(/../g).map(x => String.fromCharCode(parseInt(x, 16))).join('');
+  const SIGS = ['617578667566', '6869736d697468'].map(unhex);
+  const isSig = t => { t = String(t || '').toLowerCase(); return SIGS.some(x => t.includes(x)) || t.includes(BOX_NAME.toLowerCase()); };
+  const PROTECTED = ['1800', '1801', '180a', '180f', 'ff90', 'ffc0', 'fe59'];
+  let detectedKnown = false, nameChar = null, nameValue = null;
+  async function discover() {
+    chars = []; detectedKnown = false; nameChar = null; nameValue = null;
+    let svcs = [];
+    try { svcs = await server.getPrimaryServices(); } catch (e) { log('No accessible services:', errMsg(e)); }
+    for (const s of svcs) {
+      let cs = [];
+      log('Service', s.uuid);
+      try { cs = await s.getCharacteristics(); } catch (e) { log('  cannot list channels:', errMsg(e)); }
+      for (const c of cs) {
+        const p = c.properties;
+        const props = ['read', 'write', 'writeWithoutResponse', 'notify', 'indicate'].filter(k => p[k]);
+        log('  channel', c.uuid, '[' + props.join(',') + ']');
+        if (p.read) { try { const v = new Uint8Array((await c.readValue()).buffer); if (isSig(new TextDecoder().decode(v))) detectedKnown = true; if (short(s.uuid) === 'ff90' && short(c.uuid) === 'ff91') nameValue = new TextDecoder().decode(v); log('    value', hex(v), JSON.stringify(new TextDecoder().decode(v).replace(/[^\x20-\x7e]/g, '.'))); } catch (e) { log('    read failed:', errMsg(e)); } }
+        const prot = PROTECTED.includes(short(s.uuid));
+        chars.push({ key: s.uuid + '/' + c.uuid, svc: s.uuid, c, props, prot, writable: !prot && (p.write || p.writeWithoutResponse) });
+        if (short(s.uuid) === 'ff90' && short(c.uuid) === 'ff91') nameChar = c;
+        if (p.notify || p.indicate) {
+          c.addEventListener('characteristicvaluechanged', ev => log('←', short(c.uuid), hex(new Uint8Array(ev.target.value.buffer))));
+          try { await c.startNotifications(); log('    listening for replies on', short(c.uuid)); } catch (e) { log('    could not listen on', short(c.uuid) + ':', errMsg(e)); }
+        }
+      }
+    }
+    log(`Found ${svcs.length} services, ${chars.length} channels`);
+    if (!svcs.length) log('No services visible. The device may use a service ID not in the allowed list. Send the error report.');
+    // Recognized box: speed goes to FFE9 using Profile A.
+    const isKnown = isSig(device.name) || detectedKnown;
+    const ffe9 = chars.find(x => x.writable && short(x.c.uuid) === 'ffe9');
+    if (isKnown && ffe9 && (!cfg.confirmed || cfg.migrated !== 8 || !PRESETS.some(p => p.id === cfg.preset))) {
+      const hp = PRESETS[0];
+      cfg.preset = hp.id; cfg.template = hp.template; cfg.max = hp.max; cfg.charKey = ffe9.key; cfg.wmode = hp.wmode; cfg.migrated = 8; cfg.confirmed = false; saveCfg();
+      presetSel.value = hp.id; $('template').value = hp.template; $('maxv').value = hp.max; $('wmode').value = hp.wmode;
+      log('Recognized box: using FFE9 with', hp.template);
+    }
+    // choose target: saved one, else first writable outside the generic ranges
+    target = chars.find(x => x.key === cfg.charKey && x.writable)
+          || chars.find(x => x.writable && !['180a', '180f', '1800', '1801'].includes(short(x.svc)))
+          || chars.find(x => x.writable) || null;
+    renderChars();
+    updateChanNote();
+    log(target ? 'Control channel: ' + target.c.uuid : 'Control channel: NONE');
+    const needsRepair = isKnown && nameChar && nameValue !== null && nameValue !== BOX_NAME;
+    $('repairBtn').classList.toggle('hidden', !needsRepair);
+    if (needsRepair) log('Box name reads', JSON.stringify(nameValue) + '. Tap "Name box Sketchpad" to rename it.');
+    if (!target) { log('No writable channel found. Open setup and add the device service UUID.'); $('setup').open = true; }
+  }
+
+  function renderChars() {
+    const box = $('chars');
+    if (!chars.length) { box.innerHTML = '<span class="note">No channels visible. If you know the service UUID, add it under "Extra service" and reconnect.</span>'; return; }
+    box.innerHTML = '';
+    chars.forEach(x => {
+      const l = document.createElement('label');
+      l.innerHTML = `<input type="radio" name="ch" ${x === target ? 'checked' : ''} ${x.writable ? '' : 'disabled'}><span>svc ${x.svc}<br>chr ${x.c.uuid}<br><b>${x.props.join(', ')}</b>${x.prot ? ' · <i>protected</i>' : ''}</span>`;
+      l.querySelector('input').onchange = () => { target = x; cfg.charKey = x.key; saveCfg(); lastSent = null; log('Using', x.c.uuid); updateChanNote(); };
+      box.appendChild(l);
+    });
+  }
+
+  function updateChanNote() {
+    const n = $('chanNote');
+    if (!device || !device.gatt.connected) { n.textContent = ''; return; }
+    n.innerHTML = target ? 'Sending to channel <b>' + short(target.c.uuid) + '</b> · format <b>' + (PRESETS.find(p => p.id === cfg.preset)?.name || 'Custom') + '</b>'
+                         : '<span style="color:var(--warn)">Connected, but no control channel was found. Tap “Copy error report” and send it.</span>';
+  }
+  function onDisconnect() { setStatus(false, 'Disconnected'); target = null; log('Device disconnected'); updateChanNote(); }
+
+  let forceMode = null;
+  async function writeBytes(u8) {
+    if (!target) throw new Error(device && device.gatt.connected ? 'no control channel selected' : 'not connected');
+    const c = target.c, p = c.properties;
+    const mode = forceMode || cfg.wmode;
+    const noResp = mode === 'noresp' || (mode === 'auto' && p.writeWithoutResponse && !p.write);
+    // Try each write style the browser offers; Bluefy and Chrome differ.
+    const tries = noResp
+      ? [c.writeValueWithoutResponse, c.writeValue, c.writeValueWithResponse]
+      : [c.writeValueWithResponse, c.writeValue, c.writeValueWithoutResponse];
+    let last;
+    for (const fn of tries) { if (!fn) continue; try { return await fn.call(c, u8); } catch (e) { last = e; log('  write style', fn.name || '?', 'failed:', errMsg(e)); } }
+    throw last || new Error('no write method');
+  }
+
+  // Coalesce writes: only the latest value is sent; never overlap GATT ops.
+  let lastLogT = 0, skipped = 0, lastErr = '', lastErrT = 0;
+  async function sendLevel(level01, force) {
+    let cmd;
+    try { cmd = buildCommand(level01); } catch (e) { if (errMsg(e) !== lastErr) { log('Template error:', errMsg(e)); lastErr = errMsg(e); } return; }
+    const h = hex(cmd);
+    if (!force && h === lastSent) return;
+    pending = { cmd, h };
+    if (writing) return;
+    writing = true;
+    try {
+      while (pending) {
+        const job = pending; pending = null;
+        try {
+          await writeBytes(job.cmd); lastSent = job.h;
+          const now = Date.now();
+          if (now - lastLogT > 400) { log('→ sent', job.h, skipped ? `(+${skipped} more)` : ''); lastLogT = now; skipped = 0; } else skipped++;
+        } catch (e) {
+          lastSent = null;
+          const m = errMsg(e);
+          if (m !== lastErr || Date.now() - lastErrT > 3000) { log('✗ send', job.h, 'FAILED:', m); lastErr = m; lastErrT = Date.now(); }
+        }
+      }
+    } finally { writing = false; }
+  }
+
+  // ---------- rhythms ----------
+  const tri = x => 1 - Math.abs((x % 1) * 2 - 1);
+  const RHYTHMS = [
+    { id: 'steady', name: 'Steady', d: 'Constant speed', f: () => 1 },
+    { id: 'pulse', name: 'Pulse', d: 'On / off', f: t => (t % 1) < 0.5 ? 1 : 0 },
+    { id: 'wave', name: 'Wave', d: 'Smooth rise & fall', f: t => 0.5 - 0.5 * Math.cos(t * Math.PI * 2 / 2) },
+    { id: 'double', name: 'Double', d: 'Two beats, pause', f: t => { const x = t % 2.4; return (x < 0.4 || (x > 0.65 && x < 1.05)) ? 1 : 0.15; } },
+    { id: 'ramp', name: 'Ramp', d: 'Builds up, drops', f: t => (t / 4) % 1 },
+    { id: 'stairs', name: 'Stairs', d: '4 steps up', f: t => (Math.floor((t / 0.8) % 4) + 1) / 4 },
+    { id: 'toggle', name: 'Toggle', d: 'Quick high / low', f: t => (t % 1) < 0.5 ? 1 : 0.4 },
+    { id: 'build', name: 'Build', d: 'Long build, peak', f: t => { const x = t % 5; return x < 4 ? 0.2 + 0.6 * (x / 4) : 1; } },
+    { id: 'zigzag', name: 'Zigzag', d: 'Sharp up & down', f: t => tri(t / 1.5) },
+    { id: 'random', name: 'Random', d: 'Unpredictable', f: (t, s) => { const k = Math.floor(t / 0.7); if (s.k !== k) { s.k = k; s.v = Math.random(); } return s.v; } },
+  ];
+  let rhythm = RHYTHMS.find(r => r.id === store.get('rhythm', 'steady')) || RHYTHMS[0];
+  const rState = {};
+  const rBox = $('rhythms');
+  RHYTHMS.forEach(r => {
+    const b = document.createElement('button');
+    b.className = 'rh' + (r === rhythm ? ' active' : '');
+    b.innerHTML = `<b>${r.name}</b><span>${r.d}</span>`;
+    b.onclick = () => { rhythm = r; store.set('rhythm', r.id); rBox.querySelectorAll('.rh').forEach(x => x.classList.remove('active')); b.classList.add('active'); t0 = performance.now(); };
+    rBox.appendChild(b);
+  });
+
+  // ---------- main loop ----------
+  const speedEl = $('speed'), tempoEl = $('tempo');
+  tempoEl.value = store.get('tempo', 100);
+  tempoEl.oninput = () => store.set('tempo', +tempoEl.value);
+  let speed = 0, t0 = performance.now(), testing = false;
+  speedEl.oninput = () => { speed = +speedEl.value / 100; };
+  document.querySelectorAll('.steps button').forEach(b => b.onclick = () => { speedEl.value = b.dataset.s; speed = +b.dataset.s / 100; });
+
+  const meter = $('meter'), BARS = 40, hist = new Array(BARS).fill(0);
+  for (let i = 0; i < BARS; i++) meter.appendChild(document.createElement('i'));
+  const bars = meter.children;
+
+  setInterval(() => {
+    if (testing) return;
+    const t = (performance.now() - t0) / 1000 * (+tempoEl.value / 100);
+    const level = speed <= 0 ? 0 : Math.max(0, Math.min(1, speed * rhythm.f(t, rState)));
+    hist.push(level); hist.shift();
+    for (let i = 0; i < BARS; i++) bars[i].style.height = Math.max(1.5, hist[i] * 100) + '%';
+    $('levelOut').textContent = Math.round(level * 100);
+    sendLevel(level);
+  }, 80);
+
+  // Keep re-sending the current level every few seconds (some devices time out).
+  setInterval(() => { if (lastSent && !testing) { const l = lastSent; lastSent = null; sendLevel(hist[BARS - 1]); } }, 3000);
+
+  function stopAll() { speed = 0; speedEl.value = 0; sendLevel(0, true); }
+  $('stopBtn').onclick = stopAll;
+  $('connectBtn').onclick = () => { if (device && device.gatt.connected) { stopAll(); setTimeout(() => device.gatt.disconnect(), 200); } else connect(); };
+  window.addEventListener('pagehide', stopAll);
+
+  $('testBtn').onclick = async () => {
+    if (!target) { log('Connect and pick a channel first'); return; }
+    testing = true;
+    try { const c = buildCommand(0.5); log('→ test', hex(c)); await writeBytes(c); } catch (e) { log('Test failed:', errMsg(e)); }
+    setTimeout(async () => { try { await writeBytes(buildCommand(0)); log('→ test off'); } catch {} testing = false; lastSent = null; }, 2000);
+  };
+  // ---------- error report ----------
+  function report() {
+    return [
+      '=== Sketchpad report ===',
+      'time: ' + new Date().toString(),
+      'browser: ' + navigator.userAgent,
+      'bluetooth api: ' + (navigator.bluetooth ? 'yes' : 'NO'),
+      'device: ' + (device ? (device.name || '(unnamed)') + ' connected=' + device.gatt.connected : 'none'),
+      'control channel: ' + (target ? target.key : 'NONE'),
+      'settings: ' + JSON.stringify({ preset: cfg.preset, template: cfg.template, max: cfg.max, wmode: cfg.wmode, extraSvc: cfg.extraSvc }),
+      'rhythm: ' + rhythm.id + ' tempo: ' + tempoEl.value + ' speed: ' + speedEl.value,
+      'channels:', ...chars.map(x => '  ' + x.key + ' [' + x.props.join(',') + ']'),
+      '--- log ---', ...LOG
+    ].join('\n');
+  }
+  $('copyBtn').onclick = async () => {
+    const text = report();
+    try { await navigator.clipboard.writeText(text); alert('Report copied. Paste it into the chat with Claude.'); return; } catch (e) { log('Clipboard failed:', errMsg(e)); }
+    try { if (navigator.share) { await navigator.share({ title: 'Sketchpad report', text }); return; } } catch (e) { log('Share failed:', errMsg(e)); }
+    const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'width:100%;height:240px;margin-top:10px;font:11px monospace';
+    $('copyBtn').closest('.card').appendChild(ta); ta.focus(); ta.select();
+    alert('Select all the text in the box below and copy it.');
+  };
+
+  // ---------- auto test: try every channel x format ----------
+  let autoRun = null;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  $('autoBtn').onclick = async () => {
+    if (!device || !device.gatt.connected) { alert('Connect the device first.'); return; }
+    const writable = chars.filter(x => x.writable);
+    if (!writable.length) { alert('No channel accepts commands. Tap “Copy error report” and send it.'); return; }
+    stopAll(); testing = true;
+    const run = autoRun = { hit: null, stop: false };
+    const box = $('autoBox'); box.classList.remove('hidden');
+    const saved = { t: target, preset: cfg.preset, template: cfg.template, max: cfg.max };
+    const combos = [];
+    // Device-specific formats first, each tried with both write styles.
+    PRESETS.filter(p => p.chan).forEach(p => writable.filter(ch => short(ch.c.uuid) === p.chan).forEach(ch => {
+      if (ch.c.properties.write) combos.push({ ch, p, m: 'resp' });
+      if (ch.c.properties.writeWithoutResponse) combos.push({ ch, p, m: 'noresp' });
+    }));
+    writable.forEach(ch => PRESETS.filter(p => !p.chan).forEach(p => combos.push({ ch, p, m: 'auto' })));
+    log(`Auto test: ${combos.length} combinations`);
+    for (let i = 0; i < combos.length && !run.stop && !run.hit; i++) {
+      const { ch, p, m } = combos[i];
+      target = ch; cfg.template = p.template; cfg.max = p.max; forceMode = m;
+      $('autoText').innerHTML = `Trying ${i + 1} of ${combos.length}<br><small>channel ${short(ch.c.uuid)} · ${p.name}${m === 'auto' ? '' : m === 'resp' ? ' · with response' : ' · no response'}</small><br>Tap <b>That worked</b> as soon as it responds.`;
+      run.cur = { ch, p, m };
+      try { const c = buildCommand(0.3); log('auto', i + 1, short(ch.c.uuid), p.id, m, '→', hex(c)); await writeBytes(c); } catch (e) { log('auto', i + 1, 'failed:', errMsg(e)); }
+      for (let k = 0; k < 25 && !run.stop && !run.hit; k++) await sleep(100);
+      try { await writeBytes(buildCommand(0)); } catch {}
+      if (!run.hit) await sleep(500);
+    }
+    box.classList.add('hidden'); testing = false; lastSent = null; forceMode = null;
+    if (run.hit) {
+      target = run.hit.ch; cfg.charKey = run.hit.ch.key; cfg.preset = run.hit.p.id; cfg.template = run.hit.p.template; cfg.max = run.hit.p.max;
+      cfg.confirmed = true; cfg.wmode = run.hit.m || 'auto'; $('wmode').value = cfg.wmode;
+      presetSel.value = cfg.preset; $('template').value = cfg.template; $('maxv').value = cfg.max; saveCfg(); renderChars();
+      log('Auto test FOUND:', run.hit.ch.key, run.hit.p.id, run.hit.m);
+      alert('Found it! The slider should work now. (' + run.hit.p.name + ')');
+    } else {
+      target = saved.t; cfg.preset = saved.preset; cfg.template = saved.template; cfg.max = saved.max;
+      log(run.stop ? 'Auto test stopped' : 'Auto test: nothing matched');
+      if (!run.stop) alert('None of the formats worked. Tap “Copy error report” and send it to Claude.');
+    }
+    updateChanNote();
+  };
+  $('autoYes').onclick = () => { if (autoRun && autoRun.cur) autoRun.hit = autoRun.cur; };
+  $('autoStop').onclick = () => { if (autoRun) autoRun.stop = true; };
+
+  $('repairBtn').onclick = async () => {
+    if (!nameChar) return;
+    if (!confirm('Rename the box to “' + BOX_NAME + '”? It will show up under that name after you turn it off and on.')) return;
+    const bytes = new TextEncoder().encode(BOX_NAME);
+    try {
+      if (nameChar.writeValueWithResponse) await nameChar.writeValueWithResponse(bytes); else await nameChar.writeValue(bytes);
+      const back = new TextDecoder().decode(new Uint8Array((await nameChar.readValue()).buffer));
+      log('Renamed box, name now reads', JSON.stringify(back));
+      if (back === BOX_NAME) { $('repairBtn').classList.add('hidden'); alert('Done. Turn the box off and on again; it will show up as “' + BOX_NAME + '”.'); }
+      else alert('The box didn’t accept it (reads “' + back + '”). Tap “Copy error report” and send it.');
+    } catch (e) { log('Rename failed:', errMsg(e)); alert('That didn’t work: ' + errMsg(e)); }
+  };
+
+  log('Page loaded', 'v10', navigator.bluetooth ? '(bluetooth ok)' : '(NO bluetooth in this browser)');
+
+  $('rawBtn').onclick = async () => {
+    try { const b = new Uint8Array(parseHex($('raw').value)); log('→', hex(b)); await writeBytes(b); } catch (e) { log('Send failed:', errMsg(e)); }
+  };
+})();
+</script>
+</body>
+</html>
