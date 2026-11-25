@@ -86,6 +86,7 @@
     <button class="primary" id="connectBtn">Connect device</button>
     <div class="note" id="chanNote" style="margin-top:8px"></div>
     <div class="btnrow"><button id="autoBtn">Find the right setting</button><button id="copyBtn">Copy error report</button></div>
+    <button id="allBtn" style="width:100%;margin-top:10px">Show all devices</button>
     <button id="scanBtn" style="width:100%;margin-top:10px">Find nearest device</button>
     <div class="scan hidden" id="scanBox">
       <div class="row" style="margin:0"><label>Signal</label>
@@ -256,14 +257,23 @@
 
   function setStatus(on, text) { $('dot').classList.toggle('on', on); $('statusText').textContent = text; $('connectBtn').textContent = on ? 'Disconnect' : 'Connect device'; }
 
-  async function connect() {
+  async function connect(showAll) {
     if (!navigator.bluetooth) { alert('Bluetooth is not available in this browser. On iPhone use the Bluefy browser.'); return; }
     const services = [...new Set(COMMON_SERVICES.map(full))];
     if (cfg.extraSvc) services.push(full(/^[0-9a-f]{4}$/i.test(cfg.extraSvc) ? parseInt(cfg.extraSvc, 16) : cfg.extraSvc));
     let d;
     try {
-      d = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: services });
-    } catch (e) { log('Device picker closed:', errMsg(e)); return; }
+      // Default: only list devices that look like the box (by live advertised name or control service),
+      // so a stale cached name on the phone can't hide it. "Show all devices" lists everything.
+      const opts = showAll ? { acceptAllDevices: true, optionalServices: services }
+        : { filters: [{ namePrefix: BOX_NAME }, { namePrefix: unhex('417578') }, { services: [full(0xffe5)] }, { services: [full(0xff90)] }], optionalServices: services };
+      log(showAll ? 'Opening picker: all devices' : 'Opening picker: box only');
+      d = await navigator.bluetooth.requestDevice(opts);
+    } catch (e) {
+      log('Device picker closed:', errMsg(e));
+      if (!showAll && /NotFound|cancel/i.test(errMsg(e)) === false) log('Box-only search failed; try "Show all devices".');
+      return;
+    }
     await openDevice(d);
   }
 
@@ -447,7 +457,8 @@
 
   function stopAll() { speed = 0; speedEl.value = 0; sendLevel(0, true); }
   $('stopBtn').onclick = stopAll;
-  $('connectBtn').onclick = () => { if (device && device.gatt.connected) { stopAll(); setTimeout(() => device.gatt.disconnect(), 200); } else connect(); };
+  $('connectBtn').onclick = () => { if (device && device.gatt.connected) { stopAll(); setTimeout(() => device.gatt.disconnect(), 200); } else connect(false); };
+  $('allBtn').onclick = () => { if (!(device && device.gatt.connected)) connect(true); };
   window.addEventListener('pagehide', stopAll);
 
   $('testBtn').onclick = async () => {
@@ -599,7 +610,7 @@
     } catch (e) { log('Rename failed:', errMsg(e)); alert('That didn’t work: ' + errMsg(e)); }
   };
 
-  log('Page loaded', 'v11', navigator.bluetooth ? '(bluetooth ok)' : '(NO bluetooth in this browser)');
+  log('Page loaded', 'v12', navigator.bluetooth ? '(bluetooth ok)' : '(NO bluetooth in this browser)');
 
   $('rawBtn').onclick = async () => {
     try { const b = new Uint8Array(parseHex($('raw').value)); log('→', hex(b)); await writeBytes(b); } catch (e) { log('Send failed:', errMsg(e)); }
