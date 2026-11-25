@@ -234,7 +234,7 @@
 
   // ---------- bluetooth ----------
   const COMMON_SERVICES = [
-    0xffe5, 0xffe0, 0xff90, 0xffc0, 0xfe59,
+    0xffe5, 0xffe0, 0xff90, 0xffc0, 0xfe59, 0xfff0, 0xffb0,
     0xfff0, 0xffe0, 0xffb0, 0xfee7, 0xfe95, 0xae00, 0xae30, 0xff00, 0xffa0, 0xfff5, 0xffd0, 0x1910, 0x180a, 0x180f,
     '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART
     '0000fff0-0000-1000-8000-00805f9b34fb',
@@ -266,7 +266,7 @@
       // Default: only list devices that look like the box (by live advertised name or control service),
       // so a stale cached name on the phone can't hide it. "Show all devices" lists everything.
       const opts = showAll ? { acceptAllDevices: true, optionalServices: services }
-        : { filters: [{ namePrefix: BOX_NAME }, { namePrefix: unhex('417578') }, { services: [full(0xffe5)] }, { services: [full(0xff90)] }], optionalServices: services };
+        : { filters: [{ namePrefix: BOX_NAME }, { namePrefix: unhex('417578') }, { services: [full(0xfff0)] }, { services: [full(0xffb0)] }, { manufacturerData: [{ companyIdentifier: 0x0140 }] }, { services: [full(0xffe5)] }], optionalServices: services };
       log(showAll ? 'Opening picker: all devices' : 'Opening picker: box only');
       d = await navigator.bluetooth.requestDevice(opts);
     } catch (e) {
@@ -610,7 +610,7 @@
     } catch (e) { log('Rename failed:', errMsg(e)); alert('That didn’t work: ' + errMsg(e)); }
   };
 
-  log('Page loaded', 'v12', navigator.bluetooth ? '(bluetooth ok)' : '(NO bluetooth in this browser)');
+  log('Page loaded', 'v13', navigator.bluetooth ? '(bluetooth ok)' : '(NO bluetooth in this browser)');
 
   $('rawBtn').onclick = async () => {
     try { const b = new Uint8Array(parseHex($('raw').value)); log('→', hex(b)); await writeBytes(b); } catch (e) { log('Send failed:', errMsg(e)); }
