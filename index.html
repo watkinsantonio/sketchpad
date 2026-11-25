@@ -52,6 +52,16 @@
   .note { font-size: 13px; color: var(--dim); }
   .warnbox { background: #2d2310; border: 1px solid #5c4515; color: #ffd48a; border-radius: 14px; padding: 12px; font-size: 14px; margin-bottom: 14px; }
   .hidden { display: none !important; }
+  .scan { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+  .scan .dev { display: flex; align-items: center; gap: 10px; background: #11122a; border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-top: 8px; }
+  .scan .dev.likely { border-color: var(--ok); }
+  .scan .dev .info { flex: 1; min-width: 0; font-size: 14px; }
+  .scan .dev .info small { display: block; color: var(--dim); font: 11px ui-monospace, Menlo, monospace; word-break: break-all; }
+  .scan .dev .tag { color: var(--ok); font-size: 12px; font-weight: 600; }
+  .scan .dev button { padding: 8px 12px; font-size: 14px; }
+  .bars { display: inline-flex; gap: 2px; align-items: flex-end; height: 14px; vertical-align: middle; margin-right: 4px; }
+  .bars i { width: 4px; background: #444; border-radius: 1px; }
+  .bars i.on { background: var(--ok); }
   .btnrow { display: flex; gap: 10px; margin-top: 10px; }
   .btnrow button { flex: 1; font-size: 15px; }
   .auto { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); max-width: 496px; margin: 0 auto;
@@ -76,6 +86,15 @@
     <button class="primary" id="connectBtn">Connect device</button>
     <div class="note" id="chanNote" style="margin-top:8px"></div>
     <div class="btnrow"><button id="autoBtn">Find the right setting</button><button id="copyBtn">Copy error report</button></div>
+    <button id="scanBtn" style="width:100%;margin-top:10px">Find nearest device</button>
+    <div class="scan hidden" id="scanBox">
+      <div class="row" style="margin:0"><label>Signal</label>
+        <select id="rssiMin"><option value="-45">Very close (−45)</option><option value="-55" selected>Close (−55)</option><option value="-65">Same room (−65)</option><option value="-80">Nearby (−80)</option><option value="-200">Everything</option></select>
+        <button id="scanStop">Stop</button>
+      </div>
+      <div class="note" id="scanMsg" style="margin-top:8px">Hold your phone right next to the box.</div>
+      <div id="scanList"></div>
+    </div>
     <button id="repairBtn" class="hidden" style="width:100%;margin-top:10px;border-color:var(--warn);color:var(--warn)">Name box “Sketchpad”</button>
   </div>
 
@@ -214,6 +233,7 @@
 
   // ---------- bluetooth ----------
   const COMMON_SERVICES = [
+    0xffe5, 0xffe0, 0xff90, 0xffc0, 0xfe59,
     0xfff0, 0xffe0, 0xffb0, 0xfee7, 0xfe95, 0xae00, 0xae30, 0xff00, 0xffa0, 0xfff5, 0xffd0, 0x1910, 0x180a, 0x180f,
     '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART
     '0000fff0-0000-1000-8000-00805f9b34fb',
@@ -240,16 +260,22 @@
     if (!navigator.bluetooth) { alert('Bluetooth is not available in this browser. On iPhone use the Bluefy browser.'); return; }
     const services = [...new Set(COMMON_SERVICES.map(full))];
     if (cfg.extraSvc) services.push(full(/^[0-9a-f]{4}$/i.test(cfg.extraSvc) ? parseInt(cfg.extraSvc, 16) : cfg.extraSvc));
+    let d;
     try {
-      device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: services });
+      d = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: services });
     } catch (e) { log('Device picker closed:', errMsg(e)); return; }
+    await openDevice(d);
+  }
+
+  async function openDevice(d) {
+    device = d;
     device.addEventListener('gattserverdisconnected', onDisconnect);
     setStatus(false, 'Connecting…');
     try {
       server = await device.gatt.connect();
       log('Connected to', device.name || '(unnamed)', 'id', device.id);
       await discover();
-      setStatus(true, device.name || 'Connected'); updateChanNote();
+      setStatus(true, /^[\x20-\x7e]+$/.test(device.name || '') ? device.name : 'Connected'); updateChanNote();
     } catch (e) { log('Connect failed:', errMsg(e)); setStatus(false, 'Failed — try again'); }
   }
 
@@ -500,6 +526,66 @@
   $('autoYes').onclick = () => { if (autoRun && autoRun.cur) autoRun.hit = autoRun.cur; };
   $('autoStop').onclick = () => { if (autoRun) autoRun.stop = true; };
 
+  // ---------- find nearest device (Web Bluetooth scanning, if the browser supports it) ----------
+  const printable = t => !!t && /^[\x20-\x7e]+$/.test(t);
+  const nameHex = t => Array.from(String(t || ''), ch => ch.charCodeAt(0).toString(16).padStart(2, '0')).join(' ');
+  let scan = null, scanTimer = null, scanStopT = null;
+  const seen = new Map();
+  function onAdv(e) {
+    const id = e.device.id, prev = seen.get(id);
+    const rssi = typeof e.rssi === 'number' ? e.rssi : (prev ? prev.rssi : -127);
+    const uuids = (e.uuids || []).map(short);
+    seen.set(id, { device: e.device, name: e.name || e.device.name || '', rssi: prev ? Math.round(prev.rssi * 0.6 + rssi * 0.4) : rssi, uuids, t: Date.now() });
+  }
+  function sigBars(rssi) { const n = rssi >= -50 ? 4 : rssi >= -60 ? 3 : rssi >= -70 ? 2 : rssi >= -85 ? 1 : 0; return '<span class="bars">' + [6, 9, 12, 14].map((h, i) => `<i style="height:${h}px" class="${i < n ? 'on' : ''}"></i>`).join('') + '</span>'; }
+  function renderScan() {
+    const min = +$('rssiMin').value, now = Date.now();
+    const list = [...seen.values()].filter(x => x.rssi >= min && now - x.t < 8000).sort((a, b) => b.rssi - a.rssi);
+    const box = $('scanList'); box.innerHTML = '';
+    if (!list.length) { box.innerHTML = '<div class="note" style="margin-top:8px">Nothing that close yet. Move the phone next to the box, or widen the signal range.</div>'; return; }
+    list.slice(0, 12).forEach(x => {
+      const likely = isSig(x.name) || nameHex(x.name) === 'aa 01' || x.uuids.some(u => ['ffe5', 'ff90'].includes(u));
+      const label = printable(x.name) ? x.name : (x.name ? '(unreadable name)' : '(no name)');
+      const row = document.createElement('div'); row.className = 'dev' + (likely ? ' likely' : '');
+      row.innerHTML = `<div class="info">${sigBars(x.rssi)}<b></b> ${likely ? '<span class="tag">· likely your box</span>' : ''}<small>signal ${x.rssi}${x.name && !printable(x.name) ? ' · name bytes ' + nameHex(x.name) : ''}${x.uuids.length ? ' · ' + x.uuids.slice(0, 3).join(',') : ''}</small></div><button>Connect</button>`;
+      row.querySelector('b').textContent = label;
+      row.querySelector('button').onclick = async () => { stopScan(); log('Connecting from scan:', label, 'signal', x.rssi); await openDevice(x.device); };
+      box.appendChild(row);
+    });
+  }
+  function stopScan() {
+    try { if (scan && scan.active !== false) scan.stop(); } catch {}
+    scan = null; clearInterval(scanTimer); clearTimeout(scanStopT);
+    navigator.bluetooth && navigator.bluetooth.removeEventListener && navigator.bluetooth.removeEventListener('advertisementreceived', onAdv);
+    $('scanBtn').textContent = 'Find nearest device';
+    $('scanMsg').textContent = seen.size ? 'Scan stopped. Tap Find nearest device to scan again.' : $('scanMsg').textContent;
+  }
+  $('scanBtn').onclick = async () => {
+    $('scanBox').classList.remove('hidden');
+    if (scan) { stopScan(); return; }
+    if (!navigator.bluetooth || typeof navigator.bluetooth.requestLEScan !== 'function') {
+      $('scanMsg').innerHTML = 'This browser doesn’t let web pages scan for nearby devices. Use the <b>nRF Connect</b> app’s RSSI filter instead.';
+      log('Scan not supported by this browser');
+      return;
+    }
+    seen.clear(); $('scanList').innerHTML = '';
+    try {
+      navigator.bluetooth.addEventListener('advertisementreceived', onAdv);
+      scan = await navigator.bluetooth.requestLEScan({ acceptAllAdvertisements: true, keepRepeatedDevices: true });
+      log('Scanning for nearby devices');
+      $('scanMsg').textContent = 'Scanning… hold your phone right next to the box. Green = likely your box.';
+      $('scanBtn').textContent = 'Stop scanning';
+      scanTimer = setInterval(renderScan, 500);
+      scanStopT = setTimeout(stopScan, 30000);
+    } catch (e) {
+      navigator.bluetooth.removeEventListener && navigator.bluetooth.removeEventListener('advertisementreceived', onAdv);
+      scan = null; log('Scan failed:', errMsg(e));
+      $('scanMsg').textContent = 'Scanning didn’t start: ' + errMsg(e);
+    }
+  };
+  $('scanStop').onclick = stopScan;
+  $('rssiMin').onchange = renderScan;
+
   $('repairBtn').onclick = async () => {
     if (!nameChar) return;
     if (!confirm('Rename the box to “' + BOX_NAME + '”? It will show up under that name after you turn it off and on.')) return;
@@ -513,7 +599,7 @@
     } catch (e) { log('Rename failed:', errMsg(e)); alert('That didn’t work: ' + errMsg(e)); }
   };
 
-  log('Page loaded', 'v10', navigator.bluetooth ? '(bluetooth ok)' : '(NO bluetooth in this browser)');
+  log('Page loaded', 'v11', navigator.bluetooth ? '(bluetooth ok)' : '(NO bluetooth in this browser)');
 
   $('rawBtn').onclick = async () => {
     try { const b = new Uint8Array(parseHex($('raw').value)); log('→', hex(b)); await writeBytes(b); } catch (e) { log('Send failed:', errMsg(e)); }
